@@ -1,5 +1,6 @@
 """FlowDesk M2: application entry. Mounts security middleware, auth and project routers."""
 from pathlib import Path
+import os
 import secrets
 
 from fastapi import FastAPI, Request
@@ -19,7 +20,8 @@ from .routers.collaboration import build_collaboration_router
 from .routers.dashboard import build_dashboard_router
 from .routers.ai import build_ai_router
 
-def create_app(database_url: str, static_dir: Path | None = None, token: str | None = None):
+def create_app(database_url: str, static_dir: Path | None = None, token: str | None = None,
+               allowed_origins: list[str] | None = None, allowed_hosts: list[str] | None = None):
     token = token or secrets.token_urlsafe(32)
     engine = create_engine(database_url, connect_args={'check_same_thread': False, 'timeout': 20} if database_url.startswith('sqlite') else {})
     if engine.dialect.name == 'sqlite':
@@ -31,14 +33,32 @@ def create_app(database_url: str, static_dir: Path | None = None, token: str | N
     app.state.engine = engine
     app.state.token = token
     app.state.migration_backup = migration_backup
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=['127.0.0.1', 'localhost', 'testserver'])
+    # 跨源白名单（M9 服务端化）：显式参数优先，其次环境变量 FLOWDESK_ALLOWED_ORIGINS（逗号分隔）。
+    # 空白名单 = 本地单机模式（仅允许与 base_url 同源的浏览器请求）。
+    if allowed_origins is None:
+        env_origins = os.environ.get('FLOWDESK_ALLOWED_ORIGINS', '')
+        allowed_origins = [o.strip().rstrip('/') for o in env_origins.split(',') if o.strip()] if env_origins else []
+    app.state.allowed_origins = [o.rstrip('/') for o in allowed_origins]
+    # 允许的 Host 头（M9 服务端化）：默认本地三件套；FLOWDESK_ALLOWED_HOSTS 可覆盖，'*' = 任意（局域网/公网部署）
+    if allowed_hosts is None:
+        env_hosts = os.environ.get('FLOWDESK_ALLOWED_HOSTS', '')
+        allowed_hosts = [h.strip() for h in env_hosts.split(',') if h.strip()] if env_hosts else ['127.0.0.1', 'localhost', 'testserver']
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
 
     @app.middleware('http')
     async def local_security(request: Request, call_next):
         if request.method in ('POST', 'PATCH', 'DELETE', 'PUT'):
             origin = request.headers.get('origin')
-            if origin and origin != str(request.base_url).rstrip('/'):
-                return JSONResponse({'detail': '请从 FlowDesk 本地页面操作'}, status_code=403)
+            if origin:
+                origin = origin.rstrip('/')
+                allowed = app.state.allowed_origins
+                if allowed:
+                    # 服务端模式：来源必须在白名单内（SameSite=Strict Cookie 之外的第二道防线）
+                    if origin not in allowed:
+                        return JSONResponse({'detail': '请求来源不在允许列表'}, status_code=403)
+                elif origin != str(request.base_url).rstrip('/'):
+                    # 本地单机模式：拒绝跨源（CSRF 防护），保持 M2 行为不变
+                    return JSONResponse({'detail': '请从 FlowDesk 本地页面操作'}, status_code=403)
             if not secrets.compare_digest(request.headers.get('x-flowdesk-token', '').encode('utf-8'), token.encode('utf-8')):
                 return JSONResponse({'detail': '程序已重启，请刷新页面后重试'}, status_code=403)
         response = await call_next(request)

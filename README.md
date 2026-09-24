@@ -14,9 +14,14 @@ AI 驱动的个人与小团队工作管理平台：**桌面客户端（Electron�
 - **M1 Project（已完成）**：项目增删改查、搜索筛选、日期校验、乐观锁、JSON 导出。
 - **M2 Account（已完成）**：注册/登录/退出/保持登录、会话管理、scrypt 密码哈希、按 owner_id 的项目权限隔离、登录限流、数据库迁移与备份。
 - **M3 Workspace（已完成）**：空间 + 成员多对多、Owner/Admin/Member 角色权限矩阵、按邮箱邀请成员。
-- **路线图**：M4 Task → M5 Files → M6 Dashboard/Search → M7 Collaboration → M8 AI Copilot → **M9 Electron 客户端封装**。
+- **M4 Task（已完成）**：任务全生命周期（状态/优先级/负责人/截止日/If-Match 乐观锁）。
+- **M5 Files（已完成）**：项目附件上传/下载/删除（本地存储、文件名消毒）。
+- **M6 Dashboard（已完成）**：空间/项目统计聚合 + 仪表盘视图。
+- **M7 Collaboration（已完成）**：任务评论 + 活动动态（全员留痕）。
+- **M8 AI Copilot（已完成）**：AI 会话、项目理解、任务提案（经确认才落库，OpenAI 兼容 API）。
+- **M9 Electron 客户端 + 服务端化（已完成）**：桌面客户端壳（自动拉起后端）、联网服务端模式（跨源/Host 白名单、远程访问），见 `03-技术架构.md` 第 7 节。
 
-> 架构基线：`03-技术架构.md`（客户端/服务端分层、技术栈、API 契约原则，A 维护）。
+> 架构基线：`03-技术架构.md`（客户端/服务端分层、技术栈、API 契约、M9 联网部署，A 维护）。
 > 代码位置：`Program/source/`（详见其中 README.md）。
 
 ## 多机协作
@@ -45,7 +50,24 @@ AI 驱动的个人与小团队工作管理平台：**桌面客户端（Electron�
 cd Program\source
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe launcher.py
+.\.venv\Scripts\python.exe launcher.py        # 本地单机：自动打开浏览器
+```
+
+**桌面客户端**（M9）：
+
+```powershell
+cd Program\source\frontend; npm ci; npm run build   # 先出前端产物
+cd ..\desktop; npm install; npm start               # 自动拉起后端 + 客户端窗口
+```
+
+**联网服务端**（多用户远程访问，详见 `03-技术架构.md` §7）：
+
+```powershell
+# 服务器上（示例端口 8000）
+$env:FLOWDESK_ALLOWED_HOSTS="*"
+.\.venv\Scripts\python.exe launcher.py --host 0.0.0.0 --port 8000
+# 客户端机器上：FLOWDESK_BACKEND_URL 指向服务器即联网协作
+$env:FLOWDESK_BACKEND_URL="http://<服务器IP>:8000"; npm start
 ```
 
 测试：`.\.venv\Scripts\python.exe -m pytest tests/ -q`；前端构建：`cd frontend; npm ci; npm run build`。

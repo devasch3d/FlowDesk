@@ -1,4 +1,8 @@
-"""Double-click launcher. Browser UI + FastAPI + SQLite, entirely offline."""
+"""Double-click launcher. FastAPI + SQLite, optional browser UI.
+
+本地单机（默认）：绑定 127.0.0.1，仅本机可访问。
+联网服务端：--host 0.0.0.0（或指定局域网/公网地址），并设置 FLOWDESK_ALLOWED_ORIGINS
+与 FLOWDESK_ALLOWED_HOSTS（见 03-技术架构.md M9 章节）。"""
 import argparse
 import json
 import logging
@@ -19,6 +23,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--headless', action='store_true')
     parser.add_argument('--port', type=int, default=0)
+    parser.add_argument('--host', default='127.0.0.1', help='绑定地址；0.0.0.0 开放网络访问（联网服务端模式）')
     parser.add_argument('--data-dir')
     parser.add_argument('--self-test', action='store_true', help='Validate bundled desktop runtime without opening a browser')
     args = parser.parse_args()
@@ -30,12 +35,15 @@ def main():
     # Portable data stays next to the exe, never in the temporary extraction folder.
     db_path = data / 'flowdesk.db'
     database_url = os.environ.get('FLOWDESK_DATABASE_URL', 'sqlite:///' + db_path.as_posix())
+    # 联网服务端模式：允许任意 Host 头（局域网 IP / 域名访问），Origin 白名单交给环境变量
+    if args.host != '127.0.0.1' and 'FLOWDESK_ALLOWED_HOSTS' not in os.environ:
+        os.environ['FLOWDESK_ALLOWED_HOSTS'] = '*'
     app = create_app(database_url, base / 'frontend' / 'dist')
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(('127.0.0.1', args.port))
+    sock.bind((args.host, args.port))
     port = sock.getsockname()[1]
-    url = f'http://127.0.0.1:{port}'
-    server = uvicorn.Server(uvicorn.Config(app, host='127.0.0.1', port=port, log_config=None, access_log=False))
+    url = f'http://{args.host}:{port}'
+    server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=port, log_config=None, access_log=False))
     if args.headless:
         server.run(sockets=[sock])
         return
