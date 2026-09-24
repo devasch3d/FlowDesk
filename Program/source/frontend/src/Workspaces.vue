@@ -3,7 +3,7 @@ import {computed, nextTick, onMounted, onUnmounted, reactive, ref, watch} from '
 import {useRoute, useRouter} from 'vue-router';
 import {ApiError, request, type User} from './api';
 const props=defineProps<{user:User;authBusy:boolean}>();
-const emit=defineEmits<{logout:[];account:[];'session-lost':[];'switch-view':[];'switch-tasks':[]}>();
+const emit=defineEmits<{logout:[];account:[];'session-lost':[];'switch-view':[];'switch-tasks':[];'switch-dashboard':[]}>();
 type Role='Owner'|'Admin'|'Member';
 type Member={user_id:number;username:string;email:string;role:Role;created_at:string};
 type Workspace={id:number;name:string;description:string;created_at:string;updated_at:string;role:Role};
@@ -87,6 +87,7 @@ onUnmounted(()=>{clearTimeout(toastTimer);});
    <button class="nav-item" @click="emit('switch-view')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>项目</button>
    <button class="nav-item active" @click="showList"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="10" rx="2"/><path d="M8 18h8M12 14v4"/></svg>空间 <span class="nav-count">{{spaces.length}}</span></button>
    <button class="nav-item" @click="emit('switch-tasks')"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>任务</button>
+   <button class="nav-item" @click="emit('switch-dashboard')"><svg viewBox="0 0 24 24"><path d="M4 20v-6M10 20V4M16 20v-9M22 20H2"/></svg>仪表盘</button>
    <div class="sidebar-bottom"><div class="offline"><span class="local-dot"></span> 本地运行 · 数据保存在此电脑</div><button class="profile profile-button" aria-label="查看当前账号" @click="emit('account')"><span class="avatar">{{Array.from(user.username).slice(0,1).join('')}}</span><div><strong>{{user.username}}</strong><small>{{user.email}}</small></div><span class="profile-arrow">↗</span></button></div>
   </aside>
 

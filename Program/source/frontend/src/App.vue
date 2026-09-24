@@ -4,9 +4,10 @@ import {useRouter} from 'vue-router';
 import Projects from './Projects.vue';
 import Workspaces from './Workspaces.vue';
 import TaskView from './TaskView.vue';
+import DashboardView from './views/DashboardView.vue';
 import {ApiError,request,type User} from './api';
 const router=useRouter();
-const view=ref<'projects'|'workspaces'|'tasks'>('projects');
+const view=ref<'projects'|'workspaces'|'tasks'|'dashboard'>('projects');
 const user=ref<User|null>(null),checking=ref(true),busy=ref(false),error=ref(''),bootError=ref(''),notice=ref('');
 const mode=ref<'login'|'register'>('login'),showPassword=ref(false),account=ref<HTMLDialogElement>();
 const setup=reactive({first_user:false,legacy_projects:0});
@@ -71,9 +72,10 @@ onUnmounted(()=>{clearInterval(timer);channel?.close();window.removeEventListene
 <template>
  <div v-if="checking" class="auth-loading" role="status"><div class="brand"><span class="brand-mark">F<span></span></span>FlowDesk</div><span class="spinner"></span><p>正在确认登录状态…</p></div>
  <div v-else-if="bootError&&!user" class="auth-loading"><h2>暂时无法连接 FlowDesk</h2><p role="alert">{{bootError}}</p><button class="primary" @click="refresh(true)">重新连接</button></div>
- <Projects v-else-if="user&&view==='projects'" :key="user.id" :user="user" :auth-busy="busy" @logout="logout" @account="error='';account?.showModal()" @session-lost="sessionLost" @switch-view="view='workspaces'" @switch-tasks="view='tasks'" />
- <Workspaces v-else-if="user&&view==='workspaces'" :key="user.id" :user="user" :auth-busy="busy" @logout="logout" @account="error='';account?.showModal()" @session-lost="sessionLost" @switch-view="view='projects'" @switch-tasks="view='tasks'" />
+ <Projects v-else-if="user&&view==='projects'" :key="user.id" :user="user" :auth-busy="busy" @logout="logout" @account="error='';account?.showModal()" @session-lost="sessionLost" @switch-view="view='workspaces'" @switch-tasks="view='tasks'" @switch-dashboard="view='dashboard'" />
+ <Workspaces v-else-if="user&&view==='workspaces'" :key="user.id" :user="user" :auth-busy="busy" @logout="logout" @account="error='';account?.showModal()" @session-lost="sessionLost" @switch-view="view='projects'" @switch-tasks="view='tasks'" @switch-dashboard="view='dashboard'" />
  <div v-else-if="user&&view==='tasks'" style="min-height:100vh;background:#fafafa"><div style="position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:8px;padding:10px 24px;background:#fff;border-bottom:1px solid #eee"><button style="cursor:pointer;border:1px solid #ddd;background:#fff;border-radius:6px;padding:6px 12px" @click="view='projects'">← 返回项目</button><strong style="color:#333">FlowDesk · 任务</strong></div><TaskView :key="user.id" :user="user" :auth-busy="busy" @logout="logout" @account="error='';account?.showModal()" @session-lost="sessionLost" /></div>
+ <DashboardView v-else-if="user&&view==='dashboard'" :key="user.id" :user="user" :auth-busy="busy" @logout="logout" @account="error='';account?.showModal()" @session-lost="sessionLost" @back="view='projects'" />
  <div v-else class="auth-shell">
   <section class="auth-story">
    <div class="brand"><span class="brand-mark">F<span></span></span>FlowDesk<span class="auth-version">M2 · ACCOUNT</span></div>
