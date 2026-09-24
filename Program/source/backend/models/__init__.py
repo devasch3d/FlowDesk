@@ -4,5 +4,6 @@ Importing this package registers all tables on Base.metadata (required by create
 from .base import Base
 from .user import AppSetting, LoginAttempt, LoginSession, User
 from .project import Project
+from .workspace import Membership, Workspace
 
-__all__ = ['Base', 'User', 'Project', 'LoginSession', 'LoginAttempt', 'AppSetting']
+__all__ = ['Base', 'User', 'Project', 'LoginSession', 'LoginAttempt', 'AppSetting', 'Workspace', 'Membership']
