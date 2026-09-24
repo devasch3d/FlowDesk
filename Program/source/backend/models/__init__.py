@@ -5,5 +5,6 @@ from .base import Base
 from .user import AppSetting, LoginAttempt, LoginSession, User
 from .project import Project
 from .workspace import Membership, Workspace
+from .task import Task
 
-__all__ = ['Base', 'User', 'Project', 'LoginSession', 'LoginAttempt', 'AppSetting', 'Workspace', 'Membership']
+__all__ = ['Base', 'User', 'Project', 'LoginSession', 'LoginAttempt', 'AppSetting', 'Workspace', 'Membership', 'Task']
