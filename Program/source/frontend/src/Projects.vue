@@ -5,15 +5,17 @@ import {ApiError,request,type User} from './api';
 const props=defineProps<{user:User;authBusy:boolean}>();
 const emit=defineEmits<{logout:[];account:[];'session-lost':[];'switch-view':[]}>();
 type Status = 'Planning'|'Active'|'Paused'|'Completed'|'Archived';
-type Input = {name:string;description:string;status:Status;start_date:string|null;deadline:string|null};
-type Project = Input & {id:number;created_at:string;updated_at:string;version:number};
+type Input = {workspace_id:number|null;name:string;description:string;status:Status;start_date:string|null;deadline:string|null};
+type Project = Input & {id:number;owner_id:number|null;created_at:string;updated_at:string;version:number};
+type Workspace = {id:number;name:string;description:string;role:string};
 const labels:Record<Status,string>={Planning:'计划中',Active:'进行中',Paused:'已暂停',Completed:'已完成',Archived:'已归档'};
 const statuses=Object.keys(labels) as Status[];
 const route=useRoute(), router=useRouter();
 const projects=ref<Project[]>([]), loading=ref(true), loadError=ref(''), toast=ref('');
+const workspaces=ref<Workspace[]>([]);
 const search=ref(''), filter=ref('all'), sort=ref('updated'), layout=ref('grid');
 const modal=ref(false), saving=ref(false), deleting=ref(false), formError=ref(''), deleteError=ref(''), editing=ref<Project|null>(null), deleteTarget=ref<Project|null>(null);
-const form=reactive<Input>({name:'',description:'',status:'Planning',start_date:null,deadline:null});
+const form=reactive<Input>({workspace_id:null,name:'',description:'',status:'Planning',start_date:null,deadline:null});
 const editor=ref<HTMLDialogElement>(), confirmer=ref<HTMLDialogElement>(), nameInput=ref<HTMLInputElement>();
 const selected=computed(()=>projects.value.find(p=>p.id===Number(route.params.id)));
 const isDetail=computed(()=>route.params.id!==undefined);
@@ -40,9 +42,9 @@ async function exportProjects(){
  try{const data=await api('/export');const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='FlowDesk-projects.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
  catch(e){notify((e as Error).message);}
 }
-async function load(){loading.value=true;loadError.value='';try{projects.value=await api('/projects');}catch(e){loadError.value=(e as Error).message;}finally{loading.value=false;}}
-function openCreate(){editing.value=null;Object.assign(form,{name:'',description:'',status:'Planning',start_date:null,deadline:null});showEditor();}
-function openEdit(p:Project){editing.value={...p};Object.assign(form,{name:p.name,description:p.description,status:p.status,start_date:p.start_date,deadline:p.deadline});showEditor();}
+async function load(){loading.value=true;loadError.value='';try{[projects.value,workspaces.value]=await Promise.all([api('/projects'),api('/workspaces')]);}catch(e){loadError.value=(e as Error).message;}finally{loading.value=false;}}
+function openCreate(){editing.value=null;Object.assign(form,{workspace_id:workspaces.value[0]?.id??null,name:'',description:'',status:'Planning',start_date:null,deadline:null});showEditor();}
+function openEdit(p:Project){editing.value={...p};Object.assign(form,{workspace_id:p.workspace_id,name:p.name,description:p.description,status:p.status,start_date:p.start_date,deadline:p.deadline});showEditor();}
 function showEditor(){formError.value='';modal.value=true;nextTick(()=>{editor.value?.showModal();nameInput.value?.focus();});}
 function closeEditor(){if(!saving.value){editor.value?.close();modal.value=false;}}
 async function save(){
@@ -121,7 +123,8 @@ onUnmounted(()=>{clearInterval(clockTimer);clearTimeout(toastTimer);});
 
  <dialog ref="editor" class="editor" aria-labelledby="editor-title" @cancel.prevent="closeEditor">
   <form v-if="modal" @submit.prevent="save"><div class="modal-heading"><div><div class="eyebrow">PROJECT</div><h2 id="editor-title">{{editing?'编辑项目':'新建项目'}}</h2></div><button type="button" class="close" aria-label="关闭" :disabled="saving" @click="closeEditor">×</button></div><p class="modal-intro">{{editing?'更新计划，让项目始终保持清晰。':'为你的下一个想法，建立一个起点。'}}</p>
-   <fieldset :disabled="saving"><label for="name">项目名称 <span class="required">*</span></label><input id="name" ref="nameInput" v-model="form.name" required maxlength="120" placeholder="例如：FlowDesk 第一版开发" autocomplete="off"><div class="field-hint">清晰的名称，让项目更容易被找到 <span>{{form.name.length}}/120</span></div>
+   <fieldset :disabled="saving"><label for="ws">所属空间 <span class="required">*</span></label><select id="ws" v-model.number="form.workspace_id"><option :value="null">个人项目（不挂靠空间）</option><option v-for="w in workspaces" :key="w.id" :value="w.id">{{w.name}}</option></select>
+   <label for="name">项目名称 <span class="required">*</span></label><input id="name" ref="nameInput" v-model="form.name" required maxlength="120" placeholder="例如：FlowDesk 第一版开发" autocomplete="off"><div class="field-hint">清晰的名称，让项目更容易被找到 <span>{{form.name.length}}/120</span></div>
    <label for="description">项目描述 <span class="optional">选填</span></label><textarea id="description" v-model="form.description" rows="4" maxlength="10000" placeholder="这个项目要实现什么？记录背景、目标或计划…"></textarea>
    <label for="status">项目状态</label><select id="status" v-model="form.status"><option v-for="s in statuses" :key="s" :value="s">{{labels[s]}} · {{s}}</option></select>
    <div class="date-fields"><div><label for="start">开始日期 <span class="optional">选填</span></label><input id="start" v-model="form.start_date" type="date" min="0001-01-01" max="9999-12-31"></div><div><label for="deadline">截止日期 <span class="optional">选填</span></label><input id="deadline" v-model="form.deadline" type="date" min="0001-01-01" max="9999-12-31"></div></div></fieldset>
