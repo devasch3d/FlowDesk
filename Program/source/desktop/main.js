@@ -1,10 +1,12 @@
 // FlowDesk Electron 主进程（M9，机器 A 维护）
 // 职责：管理后端进程并创建客户端窗口。
 //
-// 三种加载模式（按优先级）：
-// 1. FLOWDESK_BACKEND_URL=...    联网客户端：直接连接外部服务端（远程/云部署），不拉起本地后端
-// 2. VITE_DEV_SERVER_URL=...     前端开发模式：连接 Vite dev server（后端请自行启动）
-// 3. 默认                        本地一体模式：自动拉起 launcher.py（headless），等待就绪后加载
+// 启动决策链（按优先级）：
+// 1. VITE_DEV_SERVER_URL    前端开发模式（后端自行启动）
+// 2. 联网优先：探测 FLOWDESK_SERVER_URL（缺省 DEFAULT_SERVER_URL）
+//    - 连上 → 联网协作模式（加载远程服务端）
+//    - 连不上 → 自动降级本地一体模式（拉起本机后端，标题标注"本地模式"）
+// 3. 兜底                    本地一体模式（同 2 的降级路径）
 //
 // 安全原则：业务逻辑与权限判断全部在服务端；本文件只做进程管理与窗口加载。
 const {app, BrowserWindow, dialog} = require('electron');
@@ -13,16 +15,38 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 
-const SOURCE_DIR = path.join(__dirname, '..');          // Program/source
+const SOURCE_DIR = path.join(__dirname, '..');          // 开发期：Program/source
 const LAUNCHER = path.join(SOURCE_DIR, 'launcher.py');
-// 优先使用项目 venv 的 Python（依赖齐全）；未创建 venv 时退回 PATH 中的 python；可用 FLOWDESK_PYTHON 覆盖
+// 开发期优先项目 venv 的 Python；打包后优先内嵌的后端 exe（见 resolveBackend()）
 const VENV_PYTHON = path.join(SOURCE_DIR, '.venv', 'Scripts', 'python.exe');
-const PYTHON = process.env.FLOWDESK_PYTHON || (fs.existsSync(VENV_PYTHON) ? VENV_PYTHON : 'python');
+
+// 默认服务端地址：固定 IP 后改为 http://192.168.x.x:8000（打包前改这里）
+// 运行时可用环境变量 FLOWDESK_SERVER_URL 覆盖（便于多套部署不改代码）
+const DEFAULT_SERVER_URL = 'http://192.168.1.23:8000';
+const SERVER_URL = process.env.FLOWDESK_SERVER_URL || DEFAULT_SERVER_URL;
 
 let backend = null;
 let quitting = false;
 
-// 轮询后端 /api/health 直至就绪或超时
+// 探测服务端是否可达（3 秒超时）
+function probeServer(url, timeoutMs = 3000) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (ok) => { if (!done) { done = true; resolve(ok); } };
+    try {
+      const u = new URL(url);
+      const req = http.get({host: u.hostname, port: u.port || (u.protocol === 'https:' ? 443 : 80), path: '/api/health', timeout: timeoutMs}, (res) => {
+        res.resume();
+        finish(res.statusCode === 200);
+      });
+      req.on('error', () => finish(false));
+      req.on('timeout', () => { req.destroy(); finish(false); });
+      setTimeout(() => finish(false), timeoutMs + 200);
+    } catch (e) { finish(false); }
+  });
+}
+
+// 轮询本机后端 /api/health 直至就绪或超时
 function waitForHealth(port, timeoutMs = 30000, intervalMs = 300) {
   const deadline = Date.now() + timeoutMs;
   return new Promise((resolve, reject) => {
@@ -43,8 +67,21 @@ function waitForHealth(port, timeoutMs = 30000, intervalMs = 300) {
   });
 }
 
+// 解析后端启动命令：打包环境（resources/backend/*.exe）→ 开发 venv python → PATH python
+function resolveBackend() {
+  if (process.resourcesPath) {
+    const exe = path.join(process.resourcesPath, 'backend', 'flowdesk-backend.exe');
+    if (fs.existsSync(exe)) return {cmd: exe, args: ['--headless', '--host', '127.0.0.1', '--port']};
+  }
+  if (fs.existsSync(VENV_PYTHON)) {
+    return {cmd: VENV_PYTHON, args: [LAUNCHER, '--headless', '--host', '127.0.0.1', '--port']};
+  }
+  return {cmd: 'python', args: [LAUNCHER, '--headless', '--host', '127.0.0.1', '--port']};
+}
+
 function startBackend(port) {
-  backend = spawn(PYTHON, [LAUNCHER, '--headless', '--host', '127.0.0.1', '--port', String(port)], {
+  const {cmd, args} = resolveBackend();
+  backend = spawn(cmd, [...args, String(port)], {
     cwd: SOURCE_DIR,
     windowsHide: true,
     stdio: 'ignore',
@@ -54,13 +91,14 @@ function startBackend(port) {
       dialog.showErrorBox('FlowDesk 后端已退出', `后端进程异常退出（code=${code}）。\n请查看 data/flowdesk.log 或重新打开应用。`);
     }
   });
+  return backend;
 }
 
-function createWindow(url) {
+function createWindow(url, localFallback = false) {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
-    title: 'FlowDesk',
+    title: localFallback ? 'FlowDesk（本地模式）' : 'FlowDesk',
     autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true,
@@ -69,24 +107,23 @@ function createWindow(url) {
     },
   });
   win.loadURL(url);
-  win.on('closed', () => {});
   return win;
 }
 
 app.whenReady().then(async () => {
   let activeUrl;
-  const remoteUrl = process.env.FLOWDESK_BACKEND_URL;
-  if (remoteUrl) {
-    // 联网客户端模式：连接外部服务端（多用户在线协作时，各成员客户端均指向同一服务端）
-    activeUrl = remoteUrl;
+  const devUrl = process.env.VITE_DEV_SERVER_URL;
+  if (devUrl) {
+    activeUrl = devUrl;
     createWindow(activeUrl);
   } else {
-    const devUrl = process.env.VITE_DEV_SERVER_URL;
-    if (devUrl) {
-      activeUrl = devUrl;
+    // 联网优先：探测服务端
+    const online = await probeServer(SERVER_URL);
+    if (online) {
+      activeUrl = SERVER_URL;
       createWindow(activeUrl);
     } else {
-      // 本地一体模式：自动拉起后端
+      // 降级：本地一体模式
       const port = process.env.FLOWDESK_PORT
         ? Number(process.env.FLOWDESK_PORT)
         : 8756 + Math.floor(Math.random() * 500);
@@ -99,7 +136,7 @@ app.whenReady().then(async () => {
         return;
       }
       activeUrl = `http://127.0.0.1:${port}/`;
-      createWindow(activeUrl);
+      createWindow(activeUrl, true);
     }
   }
   app.on('activate', () => {
