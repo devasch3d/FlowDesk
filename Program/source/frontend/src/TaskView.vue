@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {onMounted, reactive, ref} from 'vue';
 import {ApiError, request, type User} from './api';
+import CommentSection from './views/CommentSection.vue';
 const props=defineProps<{user:User;projectId?:number}>();
 const emit=defineEmits<{logout:[];account:[];'session-lost':[]}>();
 type TaskStatus='Todo'|'In Progress'|'Review'|'Done';
@@ -13,6 +14,8 @@ const priorities:TaskPriority[]=['Low','Medium','High','Urgent'];
 const priorityLabels:Record<TaskPriority,string>={Low:'低',Medium:'中',High:'高',Urgent:'紧急'};
 const tasks=ref<Task[]>([]), projects=ref<Project[]>([]), loading=ref(true), error=ref(''), toast=ref('');
 const selectedProject=ref<number|null>(props.projectId??null);
+const openComments=ref<number|null>(null);
+function toggleComments(id:number){openComments.value=openComments.value===id?null:id;}
 const modal=ref(false), saving=ref(false), formError=ref('');
 const form=reactive({title:'',description:'',status:'Todo' as TaskStatus,priority:'Medium' as TaskPriority,due_date:null as string|null});
 const editor=ref<HTMLDialogElement>();
@@ -89,6 +92,8 @@ onMounted(load);
       <span v-if="t.due_date" style="fontSize:11,padding:'2px 6px',borderRadius:4,background:#eee">◷ {{t.due_date}}</span>
      </div>
      <button style="margin-top:6px;font-size:11px;padding:2px 8px" @click="cycleStatus(t)">推进 →</button>
+     <button style="margin-top:6px;font-size:11px;padding:2px 8px" @click="toggleComments(t.id)">{{openComments===t.id?'收起评论':'评论'}}</button>
+     <CommentSection v-if="openComments===t.id" :user="user" :task-id="t.id" @session-lost="emit('session-lost')" />
     </div>
    </div>
   </div>

@@ -3,7 +3,7 @@ import {computed, nextTick, onMounted, onUnmounted, reactive, ref, watch} from '
 import {useRoute, useRouter} from 'vue-router';
 import {ApiError, request, type User} from './api';
 const props=defineProps<{user:User;authBusy:boolean}>();
-const emit=defineEmits<{logout:[];account:[];'session-lost':[];'switch-view':[];'switch-tasks':[];'switch-dashboard':[]}>();
+const emit=defineEmits<{logout:[];account:[];'session-lost':[];'switch-view':[];'switch-tasks':[];'switch-dashboard':[];'switch-activities':[workspaceId:number]}>();
 type Role='Owner'|'Admin'|'Member';
 type Member={user_id:number;username:string;email:string;role:Role;created_at:string};
 type Workspace={id:number;name:string;description:string;created_at:string;updated_at:string;role:Role};
@@ -116,7 +116,7 @@ onUnmounted(()=>{clearTimeout(toastTimer);});
     </template>
     <template v-else-if="selected">
      <button class="back-link" @click="showList">← 返回空间列表</button>
-     <div class="heading detail-heading"><div class="detail-title"><span class="project-icon big" :class="'color-'+selected.id%4">{{initials(selected.name)}}</span><div><span class="eyebrow">WORKSPACE OVERVIEW</span><h1>{{selected.name}}</h1></div></div><button v-if="canManage" class="primary" @click="openEdit">编辑空间</button></div>
+     <div class="heading detail-heading"><div class="detail-title"><span class="project-icon big" :class="'color-'+selected.id%4">{{initials(selected.name)}}</span><div><span class="eyebrow">WORKSPACE OVERVIEW</span><h1>{{selected.name}}</h1></div></div><div style="display:flex;gap:8px"><button class="secondary" @click="emit('switch-activities', selected.id)">活动</button><button v-if="canManage" class="primary" @click="openEdit">编辑空间</button></div></div>
      <div class="detail-grid"><section class="detail-main"><div class="detail-tabs">空间概览</div><div class="detail-content"><h2>空间描述</h2><p class="description" :class="{muted:!selected.description}">{{selected.description||'这个空间还没有描述。点击“编辑空间”，补充目标与协作说明。'}}</p><div class="detail-note"><span>◇</span><div><strong>空间是协作的边界</strong><p>只有空间成员才能看到这里的内容；权限由角色控制。</p></div></div></div></section><aside class="detail-meta"><h2>空间信息</h2><dl><dt>我的角色</dt><dd><span class="role-badge" :class="'role-'+selected.role">{{roleLabels[selected.role as Role]}}</span></dd><dt>成员数量</dt><dd>{{selected.members.length}} 人</dd><dt>创建时间</dt><dd>{{timeLabel(selected.created_at)}}</dd><dt>最后更新</dt><dd>{{timeLabel(selected.updated_at)}}</dd><dt>空间编号</dt><dd class="mono">WS-{{String(selected.id).padStart(4,'0')}}</dd></dl></aside></div>
      <section class="project-area" style="margin-top:28px">
       <div class="section-title"><h2>成员 <span class="heading-count" style="padding:0 8px;border-radius:7px;background:#eaeaf4;color:#85829d;font-size:12px">{{selected.members.length}}</span></h2><button v-if="canManage" class="primary" @click="openAdd"><span class="plus">＋</span>添加成员</button></div>
