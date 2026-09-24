@@ -22,7 +22,7 @@ AI 驱动的个人与小团队工作管理平台：**桌面客户端（Electron�
 ## 多机协作
 
 - 协作模型：单仓库 + `main` 保护分支 + 每人 `feat/机器编号` 分支 + PR 合入（详见 `01-协作规范.md`）。
-- 机器与目录归属：见 `02-任务切分表.md`（当前 A–G 共 7 台机器）。
+- 机器与目录归属：见 `02-任务切分表.md`（当前 A–F 在岗，G 王鹄毅暂离、测试与发布由 A 暂代）。
 - 成员操作手册：见 `多机协作成员操作手册.pdf`（仓库外，与规范配套）。
 - Agent 提示词模板：`prompts/`（通用边界 + Codex Plus + 豆包工作版）。
 - 新机器接入：`powershell -ExecutionPolicy Bypass -File scripts/setup-machine.ps1 -Machine X`（X 为你的机器编号）。
