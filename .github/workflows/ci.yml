@@ -1,0 +1,37 @@
+# FlowDesk CI：每个分支 push 和 PR 自动执行回归测试 + 前端构建
+# 维护人：机器 A（暂代 G 的测试与发布职责）。各机器 PR 合入前自动验证，失败则不能合并。
+name: CI
+
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+
+jobs:
+  backend-tests:
+    name: Backend pytest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Program/source
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - run: python -m pytest tests/ -q
+
+  frontend-build:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Program/source/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run build
