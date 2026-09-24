@@ -15,6 +15,7 @@ from .routers.projects import build_projects_router
 from .routers.workspaces import build_workspaces_router
 from .routers.tasks import build_tasks_router
 from .routers.files import build_files_router
+from .routers.dashboard import build_dashboard_router
 
 def create_app(database_url: str, static_dir: Path | None = None, token: str | None = None):
     token = token or secrets.token_urlsafe(32)
@@ -67,6 +68,7 @@ def create_app(database_url: str, static_dir: Path | None = None, token: str | N
     app.include_router(build_workspaces_router(engine, current_user))
     app.include_router(build_tasks_router(engine, current_user))
     app.include_router(build_files_router(engine, current_user))
+    app.include_router(build_dashboard_router(engine, current_user))
 
     @app.get('/api/health')
     def health():
