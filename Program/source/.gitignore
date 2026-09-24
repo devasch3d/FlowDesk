@@ -1,0 +1,13 @@
+.venv/
+node_modules/
+__pycache__/
+.pytest_cache/
+data/
+test-data/
+*.db
+*.log
+.env
+build/
+release/
+*.spec
+test-results/

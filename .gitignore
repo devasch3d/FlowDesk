@@ -1,0 +1,44 @@
+# ---- FlowDesk 仓库根 .gitignore ----
+# 大文件 / 本地产物 / 运行数据一律不进仓库（多机协作强制）
+
+# 构建产物与打包
+*.exe
+*.zip
+*.7z
+*.tar.gz
+
+# 数据库与数据
+*.db
+*.sqlite
+*.sqlite3
+data/
+Program/data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.log
+
+# 前端
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# 编辑器与系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 测试产物
+test-results/
+runtime-check.json
+check_the_result.json
+
+# 发布/备份（用 Git LFS 或另存，不入库）
+Launch Version/
+Backup/
+发布包/
+归档/
