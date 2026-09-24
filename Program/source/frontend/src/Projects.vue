@@ -3,7 +3,7 @@ import {computed, nextTick, onMounted, onUnmounted, reactive, ref, watch} from '
 import {useRoute, useRouter} from 'vue-router';
 import {ApiError,request,type User} from './api';
 const props=defineProps<{user:User;authBusy:boolean}>();
-const emit=defineEmits<{logout:[];account:[];'session-lost':[]}>();
+const emit=defineEmits<{logout:[];account:[];'session-lost':[];'switch-view':[]}>();
 type Status = 'Planning'|'Active'|'Paused'|'Completed'|'Archived';
 type Input = {name:string;description:string;status:Status;start_date:string|null;deadline:string|null};
 type Project = Input & {id:number;created_at:string;updated_at:string;version:number};
@@ -75,6 +75,7 @@ onUnmounted(()=>{clearInterval(clockTimer);clearTimeout(toastTimer);});
    <div class="space"><span class="space-icon">P</span><div><strong>我的项目空间</strong><small>LOCAL WORKSPACE</small></div><span class="local-dot"></span></div>
    <div class="nav-label">工作台</div>
    <button class="nav-item active" @click="showAll"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>项目 <span class="nav-count">{{projects.length}}</span></button>
+   <button class="nav-item" @click="emit('switch-view')"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="10" rx="2"/><path d="M8 18h8M12 14v4"/></svg>空间</button>
    <div class="nav-label status-label">项目状态</div>
    <button v-for="s in statuses" :key="s" class="status-nav" :class="{chosen:filter===s&&!isDetail}" @click="chooseStatus(s)"><i class="dot" :class="s"></i>{{labels[s]}}<span>{{counts[s]}}</span></button>
    <div class="sidebar-bottom"><div class="offline"><span class="local-dot"></span> 本地运行 · 数据保存在此电脑</div><button class="profile profile-button" aria-label="查看当前账号" @click="emit('account')"><span class="avatar">{{Array.from(user.username).slice(0,1).join('')}}</span><div><strong>{{user.username}}</strong><small>{{user.email}}</small></div><span class="profile-arrow">↗</span></button></div>
