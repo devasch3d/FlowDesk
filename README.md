@@ -91,12 +91,19 @@ npx electron-builder --win portable   # 自解压单 exe（已知问题：内嵌
 npx electron-builder --win nsis       # 安装版
 ```
 
-**客户端启动决策**（`desktop/main.js`）：先探测 `FLOWDESK_SERVER_URL`（默认 `http://192.168.1.23:8000`，打包前在 main.js 改为你的固定 IP）→ 连上 = 联网协作；连不上 = 自动降级本机模式（内嵌后端）。
+**客户端启动决策链**（`desktop/main.js`，按优先级自动选择）：
+1. 显式配置 `FLOWDESK_SERVER_URL`（打包写死 / 环境变量）
+2. **局域网自动发现**（推荐）：服务端周期广播 UDP `FlowDesk:<port>`（端口 45678），客户端监听自动找到并连接——**服务端 IP 变化也能自动跟上，无需固定 IP**
+3. 记忆地址：上次连接成功的服务端（存于 `%APPDATA%\flowdesk-desktop\flowdesk-server.json`）
+4. 兜底：自动降级本地一体模式（内嵌后端，标题标注"本地模式"）
 
-## 固定 IP（服务端常驻前提）
+**使用方式**：服务端电脑运行 `start-server.ps1`（绑 0.0.0.0 并自动广播）；同一局域网内其他电脑双击 `FlowDesk.exe` 即自动连上服务端；服务端不在线时自动降级本地模式。
 
-1. 浏览器进入路由器后台（常见 `192.168.x.1`）→ 登录
-2. 找到「DHCP 服务器 / 静态地址分配 / 地址保留」
-3. 添加一条：服务端电脑的 **MAC 地址** → 分配固定 IP（如 `192.168.223.100`）
-4. 保存后重启该电脑网络；`ipconfig` 确认 IP 不再变化
-5. 把该 IP 填进 `desktop/main.js` 的 `DEFAULT_SERVER_URL` 后重新打包，其他电脑双击即自动连上
+> 局限：启用 AP 隔离 / 禁止 UDP 广播的网络收不到广播；此时可设置 `FLOWDESK_SERVER_URL` 显式指定服务端地址，或改用 Tailscale 组网（见下）。
+
+## Tailscale 组网（可选：跨网络 / IP 永久固定）
+
+没有路由器控制权（公用局域网）时，固定 IP 不可用；若还需要**跨网络访问 + 永久稳定地址**，用 Tailscale 免费个人版（100 台设备）：
+1. 所有电脑安装 `tailscale.com/download`，登录同一账号
+2. 服务端查虚拟 IP：`tailscale ip -4`（如 `100.87.12.3`，永久不变）
+3. 服务端：`start-server.ps1`；客户端：设置 `FLOWDESK_SERVER_URL=http://100.87.12.3:8000` 后打包/启动

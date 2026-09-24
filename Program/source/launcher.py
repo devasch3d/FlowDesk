@@ -19,6 +19,30 @@ import uvicorn
 from backend.app import create_app
 from backend.backup import backup_sqlite
 
+# 局域网自动发现端口（UDP）：服务端在此广播 "FlowDesk:<port>"，客户端监听后自动连接
+DISCOVERY_PORT = 45678
+
+def start_announcer(port: int) -> None:
+    """周期广播服务地址，供 FlowDesk 客户端（desktop/main.js）零配置自动发现。
+
+    原理：UDP 广播到 255.255.255.255:45678，载荷 "FlowDesk:<http_port>"。
+    广播源 IP 即服务端当前局域网 IP——IP 变化（无固定 IP 环境）客户端也能自动跟上。
+    注意：启用 AP 隔离/禁止广播的网络收不到；此时客户端可改用记忆地址或手动配置。"""
+    def loop():
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        except OSError:
+            return
+        payload = f'FlowDesk:{port}'.encode('ascii')
+        while True:
+            try:
+                sock.sendto(payload, ('255.255.255.255', DISCOVERY_PORT))
+            except OSError:
+                pass
+            time.sleep(2)
+    threading.Thread(target=loop, daemon=True).start()
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--headless', action='store_true')
@@ -43,6 +67,8 @@ def main():
     sock.bind((args.host, args.port))
     port = sock.getsockname()[1]
     url = f'http://{args.host}:{port}'
+    if args.host != '127.0.0.1':
+        start_announcer(port)
     server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=port, log_config=None, access_log=False))
     if args.headless:
         server.run(sockets=[sock])
