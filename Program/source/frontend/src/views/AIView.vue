@@ -26,6 +26,7 @@ const generating = ref(false);
 const proposals = ref<(Proposal & {checked: boolean})[]>([]);
 const creating = ref(false);
 const settingsOpen = ref(false);
+const settingsDialog = ref<HTMLDialogElement>();
 const settings = reactive({base_url: '', model: '', api_key: '', enabled: false});
 let toastTimer: ReturnType<typeof setTimeout>;
 
@@ -89,6 +90,7 @@ async function send() {
 
 async function openSettings() {
   settingsOpen.value = true;
+  settingsDialog.value?.showModal();
   try {
     const s = await api('/ai/settings');
     settings.base_url = s.base_url || '';
@@ -98,12 +100,16 @@ async function openSettings() {
   } catch (e) {notify((e as Error).message);}
 }
 
+function closeSettings() {
+  if (settingsOpen.value) {settingsOpen.value = false; settingsDialog.value?.close();}
+}
+
 async function saveSettings() {
   try {
     const payload: Record<string, unknown> = {base_url: settings.base_url, model: settings.model, enabled: settings.enabled};
     if (settings.api_key.trim()) payload.api_key = settings.api_key.trim();
     await api('/ai/settings', 'PUT', payload);
-    settingsOpen.value = false;
+    closeSettings();
     notify('AI 设置已保存');
   } catch (e) {notify((e as Error).message);}
 }
@@ -207,8 +213,8 @@ onMounted(async () => {
     </div>
    </div>
   </main>
-  <dialog v-if="settingsOpen" style="border:none;border-radius:12px;padding:24px;min-width:420px" @cancel="settingsOpen=false">
-   <div style="display:flex;align-items:center;margin-bottom:12px"><h2 style="margin:0">AI 设置</h2><button style="margin-left:auto;border:none;background:none;font-size:16px;cursor:pointer" @click="settingsOpen=false">×</button></div>
+  <dialog ref="settingsDialog" style="border:none;border-radius:12px;padding:24px;min-width:420px" @cancel="closeSettings">
+   <div style="display:flex;align-items:center;margin-bottom:12px"><h2 style="margin:0">AI 设置</h2><button style="margin-left:auto;border:none;background:none;font-size:16px;cursor:pointer" @click="closeSettings">×</button></div>
    <form @submit.prevent="saveSettings">
     <label style="display:block;font-size:13px;margin-bottom:4px">API Base URL</label>
     <input v-model="settings.base_url" style="width:100%;margin-bottom:10px;padding:6px" placeholder="https://api.openai.com/v1">
@@ -218,7 +224,7 @@ onMounted(async () => {
     <input v-model="settings.api_key" type="password" style="width:100%;margin-bottom:10px;padding:6px" placeholder="sk-…">
     <label style="display:flex;gap:6px;align-items:center;font-size:13px;margin-bottom:12px"><input v-model="settings.enabled" type="checkbox"><span>启用 AI 对话</span></label>
     <div style="display:flex;gap:8px;justify-content:flex-end">
-     <button type="button" @click="settingsOpen=false">取消</button>
+     <button type="button" @click="closeSettings">取消</button>
      <button class="primary" type="submit">保存</button>
     </div>
    </form>

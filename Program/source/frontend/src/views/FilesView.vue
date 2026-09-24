@@ -61,14 +61,14 @@ onMounted(async()=>{await loadScopes();await loadFiles();});
 
 <template>
  <div class="files-view" style="padding:24px;max-width:1200px;margin:0 auto">
-  <h1>文件</h1>
-  <p style="color:#888">把附件挂到空间或项目下，成员可上传与下载，Owner/Admin 可删除。</p>
+  <h1 style="font-size:29px;letter-spacing:-.5px;font-weight:650">文件</h1>
+  <p style="color:#9299a8;font-size:12px;margin-top:9px">把附件挂到空间或项目下，成员可上传与下载，Owner/Admin 可删除。</p>
   <div style="margin:16px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-   <select :value="scope" @change="chooseScope(($event.target as HTMLSelectElement).value as Scope)">
+   <select :value="scope" @change="chooseScope(($event.target as HTMLSelectElement).value as Scope)" style="border:1px solid #e1e5ee;border-radius:6px;font-size:13px;padding:8px 10px;color:#4d5870;background:#fff">
     <option value="workspace">按空间</option>
     <option value="project">按项目</option>
    </select>
-   <select :value="scopeId??''" @change="scopeId=Number(($event.target as HTMLSelectElement).value)||null;loadFiles()" style="min-width:180px">
+   <select :value="scopeId??''" @change="scopeId=Number(($event.target as HTMLSelectElement).value)||null;loadFiles()" style="min-width:180px;border:1px solid #e1e5ee;border-radius:6px;font-size:13px;padding:8px 10px;color:#4d5870;background:#fff">
     <option value="">选择{{scope==='workspace'?'空间':'项目'}}…</option>
     <option v-for="w in scope==='workspace'?workspaces:projects" :key="w.id" :value="w.id">{{w.name}}</option>
    </select>
@@ -82,29 +82,49 @@ onMounted(async()=>{await loadScopes();await loadFiles();});
   <div v-else-if="error" style="color:#c00">{{error}}</div>
   <div v-else-if="!scopeId" style="padding:40px;text-align:center;color:#888">请先选择空间或项目查看文件</div>
   <div v-else-if="files.length===0" style="padding:40px;text-align:center;color:#888">这里还没有文件，点击右上角上传第一个附件</div>
-  <table v-else style="width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden">
-   <thead>
-    <tr style="background:#f4f4f8;text-align:left">
-     <th style="padding:10px 14px;font-size:13px">文件名</th>
-     <th style="padding:10px 14px;font-size:13px">类型</th>
-     <th style="padding:10px 14px;font-size:13px">大小</th>
-     <th style="padding:10px 14px;font-size:13px">上传时间</th>
-     <th style="padding:10px 14px;font-size:13px;text-align:right">操作</th>
-    </tr>
-   </thead>
-   <tbody>
-    <tr v-for="f in files" :key="f.id" style="border-top:1px solid #eee">
-     <td style="padding:10px 14px;font-size:13px;word-break:break-all">{{f.filename}}</td>
-     <td style="padding:10px 14px;font-size:12px;color:#888">{{f.mime_type}}</td>
-     <td style="padding:10px 14px;font-size:12px;color:#888">{{fmtSize(f.size)}}</td>
-     <td style="padding:10px 14px;font-size:12px;color:#888">{{fmtTime(f.created_at)}}</td>
-     <td style="padding:10px 14px;text-align:right;white-space:nowrap">
-      <a :href="`/api/files/${f.id}`" :download="f.filename" style="margin-right:10px;font-size:13px">下载</a>
-      <button style="border:none;background:none;cursor:pointer;color:#c00;font-size:13px" @click="remove(f)">删除</button>
-     </td>
-    </tr>
-   </tbody>
-  </table>
+  <div v-else class="file-table-wrap">
+   <table class="file-table">
+    <thead>
+     <tr>
+      <th>文件名</th>
+      <th>类型</th>
+      <th>大小</th>
+      <th>上传时间</th>
+      <th class="th-ops">操作</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr v-for="f in files" :key="f.id">
+      <td class="td-name">{{f.filename}}</td>
+      <td class="td-meta">{{f.mime_type}}</td>
+      <td class="td-meta">{{fmtSize(f.size)}}</td>
+      <td class="td-meta">{{fmtTime(f.created_at)}}</td>
+      <td class="td-ops">
+       <a :href="`/api/files/${f.id}`" :download="f.filename" class="link-download">下载</a>
+       <button class="link-delete" @click="remove(f)">删除</button>
+      </td>
+     </tr>
+    </tbody>
+   </table>
+  </div>
   <Transition name="toast"><div v-if="toast" style="position:fixed;bottom:24px;right:24px;background:#333;color:#fff;padding:8px 16px;border-radius:8px">{{toast}}</div></Transition>
  </div>
 </template>
+
+<style scoped>
+.file-table-wrap {background: #fff; border: 1px solid #e8ebf2; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(30,30,60,.05);}
+.file-table {width: 100%; border-collapse: collapse;}
+.file-table thead tr {background: #f6f7fb; text-align: left;}
+.file-table th {padding: 12px 14px; font-size: 13px; color: #4b5563; font-weight: 600; border-bottom: 1px solid #e8ebf2;}
+.file-table th.th-ops {text-align: right;}
+.file-table tbody tr {border-top: 1px solid #f0f1f6; transition: background .15s;}
+.file-table tbody tr:hover {background: #fafbff;}
+.file-table td {padding: 12px 14px; font-size: 13px; color: #374151;}
+.td-name {word-break: break-all;}
+.td-meta {font-size: 12px; color: #6b7280;}
+.td-ops {text-align: right; white-space: nowrap;}
+.link-download {margin-right: 12px; font-size: 13px; color: #5c56db; font-weight: 500;}
+.link-download:hover {text-decoration: underline;}
+.link-delete {border: none; background: none; cursor: pointer; color: #c00; font-size: 13px; padding: 2px 4px; border-radius: 4px;}
+.link-delete:hover {background: #fdeaea;}
+</style>

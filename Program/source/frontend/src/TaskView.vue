@@ -66,10 +66,10 @@ onMounted(load);
 
 <template>
  <div class="task-view" style="padding:24px;max-width:1200px;margin:0 auto">
-  <h1>任务</h1>
-  <p style="color:#888">在项目下拆解任务，跟踪状态与优先级。</p>
+  <h1 style="font-size:29px;letter-spacing:-.5px;font-weight:650">任务</h1>
+  <p style="color:#9299a8;font-size:12px;margin-top:9px">在项目下拆解任务，跟踪状态与优先级。</p>
   <div style="margin:16px 0;display:flex;gap:8px;align-items:center">
-   <select :value="selectedProject??''" @change="chooseProject(Number(($event.target as HTMLSelectElement).value))">
+   <select :value="selectedProject??''" @change="chooseProject(Number(($event.target as HTMLSelectElement).value))" style="border:1px solid #e1e5ee;border-radius:6px;font-size:13px;padding:8px 10px;color:#4d5870;background:#fff">
     <option value="">选择项目…</option>
     <option v-for="p in projects" :key="p.id" :value="p.id">{{p.name}}</option>
    </select>
@@ -78,21 +78,23 @@ onMounted(load);
   <div v-if="loading" style="padding:40px;text-align:center;color:#888">加载中…</div>
   <div v-else-if="error" style="color:#c00">{{error}}</div>
   <div v-else-if="!selectedProject" style="padding:40px;text-align:center;color:#888">请先选择一个项目查看任务</div>
-  <div v-else style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
-   <div v-for="s in statuses" :key="s" style="background:#f4f4f8;border-radius:8px;padding:12px">
-    <h3 style="margin:0 0 8px;font-size:14px">{{statusLabels[s]}} <span style="color:#888">({{tasks.filter(t=>t.status===s).length}})</span></h3>
-    <div v-for="t in tasks.filter(t=>t.status===s)" :key="t.id" style="background:#fff;border-radius:6px;padding:10px;margin-bottom:8px;box-shadow:0 1px 2px rgba(0,0,0,.08)">
+  <div v-else class="board">
+   <div v-for="s in statuses" :key="s" class="kanban-col">
+    <h3 style="margin:0 0 8px;font-size:14px">{{statusLabels[s]}} <span style="color:#6b7280">({{tasks.filter(t=>t.status===s).length}})</span></h3>
+    <div v-for="t in tasks.filter(t=>t.status===s)" :key="t.id" class="task-card">
      <div style="display:flex;justify-content:space-between;align-items:start">
-      <strong style="font-size:13px">{{t.title}}</strong>
-      <button style="border:none;background:none;cursor:pointer;color:#c00" @click="remove(t)">×</button>
+      <strong style="font-size:13px;color:#253052">{{t.title}}</strong>
+      <button class="del-btn" @click="remove(t)">×</button>
      </div>
-     <div style="font-size:12px;color:#888;margin:4px 0">{{t.description||'—'}}</div>
+     <div class="task-desc">{{t.description||'—'}}</div>
      <div style="display:flex;gap:4px;flex-wrap:wrap">
-      <span :style="{fontSize:11,padding:'2px 6px',borderRadius:4,background:t.priority==='Urgent'?'#fdd':t.priority==='High'?'#fee':'#eef'}">{{priorityLabels[t.priority]}}</span>
-      <span v-if="t.due_date" style="fontSize:11,padding:'2px 6px',borderRadius:4,background:#eee">◷ {{t.due_date}}</span>
+      <span class="tag" :class="t.priority==='Urgent'?'p-urgent':t.priority==='High'?'p-high':'p-normal'">{{priorityLabels[t.priority]}}</span>
+      <span v-if="t.due_date" class="tag tag-due">◷ {{t.due_date}}</span>
      </div>
-     <button style="margin-top:6px;font-size:11px;padding:2px 8px" @click="cycleStatus(t)">推进 →</button>
-     <button style="margin-top:6px;font-size:11px;padding:2px 8px" @click="toggleComments(t.id)">{{openComments===t.id?'收起评论':'评论'}}</button>
+     <div style="display:flex;gap:6px;margin-top:8px">
+      <button class="mini-btn" @click="cycleStatus(t)">推进 →</button>
+      <button class="mini-btn" @click="toggleComments(t.id)">{{openComments===t.id?'收起评论':'评论'}}</button>
+     </div>
      <CommentSection v-if="openComments===t.id" :user="user" :task-id="t.id" @session-lost="emit('session-lost')" />
     </div>
    </div>
@@ -119,3 +121,20 @@ onMounted(load);
   <Transition name="toast"><div v-if="toast" style="position:fixed;bottom:24px;right:24px;background:#333;color:#fff;padding:8px 16px;border-radius:8px">{{toast}}</div></Transition>
  </div>
 </template>
+
+<style scoped>
+.board {display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; align-items: start;}
+.kanban-col {background: #f6f7fb; border: 1px solid #e8ebf2; border-radius: 10px; padding: 12px;}
+.task-card {background: #fff; border: 1px solid #e8ebf2; border-radius: 8px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(30,30,60,.06); transition: box-shadow .15s, border-color .15s;}
+.task-card:hover {border-color: #c9c3ee; box-shadow: 0 4px 12px rgba(40,40,90,.08);}
+.task-desc {font-size: 12px; color: #6b7280; margin: 6px 0; word-break: break-word;}
+.tag {font-size: 11px; padding: 2px 8px; border-radius: 5px; font-weight: 500;}
+.p-urgent {background: #fdeaea; color: #b4534b;}
+.p-high {background: #fdf2e6; color: #b45309;}
+.p-normal {background: #eef2fb; color: #4d5870;}
+.tag-due {background: #f0f1f6; color: #6b7280;}
+.mini-btn {font-size: 11px; padding: 4px 10px; border: 1px solid #dfe3ec; background: #fff; border-radius: 6px; color: #667084; cursor: pointer; transition: background .15s, color .15s;}
+.mini-btn:hover {background: #f3f4f8; color: #5c56db;}
+.del-btn {border: none; background: none; cursor: pointer; color: #c00; font-size: 16px; line-height: 1; padding: 2px 4px; border-radius: 4px;}
+.del-btn:hover {background: #fdeaea;}
+</style>
