@@ -21,10 +21,10 @@ __pycache__/
 venv/
 *.log
 
-# 前端
+# 前端（dist/ 不带前导路径：匹配任意层级，避免构建产物入库引发冲突）
 node_modules/
-frontend/node_modules/
-frontend/dist/
+dist/
+*.lnk
 
 # 编辑器与系统
 .vscode/
