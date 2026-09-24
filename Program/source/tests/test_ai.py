@@ -226,6 +226,7 @@ def test_proposals_parsed_and_skipped(env, monkeypatch):
 
     def fake_llm(settings, messages, system_prompt, json_mode=False):
         assert json_mode is True
+        assert any(m['role'] == 'user' and m['content'] == '准备发布' for m in messages)  # 指令必须传给 AI
         return ('[{"title":"发布准备","description":"检查清单","priority":"High","status":"Todo","due_date":"2026-12-01"},'
                 '{"title":"","priority":"Low"}]')
 

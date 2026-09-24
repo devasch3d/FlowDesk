@@ -397,6 +397,7 @@ def build_ai_router(engine, current_user):
             project_access(db, body.project_id, user.id)
             setting = require_setting(db, user.id)
             history = recent_history(db, conv.id)
+            history.append({'role': 'user', 'content': body.instruction})  # 必须带上用户指令，否则 AI 凭空拆任务
             system = (
                 '你是 FlowDesk 的任务拆解助手。根据用户指令，把目标拆解为任务提案，'
                 '只返回一个 JSON 数组，每个元素形如 '
