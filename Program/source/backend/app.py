@@ -1,59 +1,17 @@
-"""FlowDesk M2: authenticated, owner-scoped Project REST API."""
-from datetime import date, datetime, timezone
+"""FlowDesk M2: application entry. Mounts security middleware, auth and project routers."""
 from pathlib import Path
-from typing import Literal
-import json
 import secrets
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session
 from starlette.middleware.trustedhost import TrustedHostMiddleware
-from .models import Base, Project, User
 from .migrations import migrate
 from .auth import install_auth
-
-Status = Literal['Planning', 'Active', 'Paused', 'Completed', 'Archived']
-
-class ProjectInput(BaseModel):
-    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
-    name: str = Field(min_length=1, max_length=120)
-    description: str = Field(default='', max_length=10000)
-    status: Status = 'Planning'
-    start_date: date | None = None
-    deadline: date | None = None
-
-    @model_validator(mode='after')
-    def valid_dates(self):
-        if self.start_date and self.deadline and self.deadline < self.start_date:
-            raise ValueError('截止日期不能早于开始日期')
-        return self
-
-class ProjectPatch(BaseModel):
-    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
-    name: str | None = Field(default=None, min_length=1, max_length=120)
-    description: str | None = Field(default=None, max_length=10000)
-    status: Status | None = None
-    start_date: date | None = None
-    deadline: date | None = None
-
-    @field_validator('name', 'description', 'status')
-    @classmethod
-    def not_null(cls, value):
-        if value is None:
-            raise ValueError('此字段不能为 null')
-        return value
-
-class ProjectOutput(ProjectInput):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    version: int
+from .routers.projects import build_projects_router
 
 def create_app(database_url: str, static_dir: Path | None = None, token: str | None = None):
     token = token or secrets.token_urlsafe(32)
@@ -102,87 +60,13 @@ def create_app(database_url: str, static_dir: Path | None = None, token: str | N
         return JSONResponse({'detail': message, 'errors': errors}, status_code=422)
 
     current_user = install_auth(app, engine)
+    app.include_router(build_projects_router(engine, current_user))
 
     @app.get('/api/health')
     def health():
         with Session(engine) as db:
             db.execute(select(1))
         return {'status': 'ok', 'app': 'FlowDesk', 'version': '0.2.0'}
-
-    @app.get('/api/projects', response_model=list[ProjectOutput])
-    def list_projects(user: User = Depends(current_user)):
-        with Session(engine) as db:
-            return db.scalars(select(Project).where(Project.owner_id == user.id).order_by(Project.updated_at.desc(), Project.id.desc())).all()
-
-    def find(db, project_id, user_id):
-        item = db.scalar(select(Project).where(Project.id == project_id, Project.owner_id == user_id))
-        if not item:
-            raise HTTPException(404, '项目不存在或你没有访问权限')
-        return item
-
-    @app.get('/api/projects/{project_id}', response_model=ProjectOutput)
-    def get_project(project_id: int, user: User = Depends(current_user)):
-        with Session(engine) as db:
-            return find(db, project_id, user.id)
-
-    @app.post('/api/projects', response_model=ProjectOutput, status_code=201)
-    def create_project(body: ProjectInput, user: User = Depends(current_user)):
-        now = datetime.now(timezone.utc)
-        with Session(engine) as db:
-            item = Project(**body.model_dump(), owner_id=user.id, created_at=now, updated_at=now)
-            db.add(item)
-            db.commit()
-            db.refresh(item)
-            return item
-
-    def match_version(request, item):
-        expected = request.headers.get('if-match')
-        if expected and expected != str(item.version):
-            raise HTTPException(409, '项目已在其他页面修改，请重新打开项目后再编辑')
-
-    @app.patch('/api/projects/{project_id}', response_model=ProjectOutput)
-    def update_project(project_id: int, body: ProjectPatch, request: Request, user: User = Depends(current_user)):
-        from sqlalchemy.orm.exc import StaleDataError
-        from pydantic import ValidationError
-        with Session(engine) as db:
-            item = find(db, project_id, user.id)
-            match_version(request, item)
-            values = {k: getattr(item, k) for k in ProjectInput.model_fields}
-            changes = body.model_dump(exclude_unset=True)
-            values.update(changes)
-            try:
-                ProjectInput.model_validate(values)
-            except ValidationError:
-                raise HTTPException(422, '截止日期不能早于开始日期')
-            for key, value in changes.items():
-                setattr(item, key, value)
-            item.updated_at = datetime.now(timezone.utc)
-            try:
-                db.commit()
-            except StaleDataError:
-                raise HTTPException(409, '项目已被修改，请刷新后重试')
-            db.refresh(item)
-            return item
-
-    @app.delete('/api/projects/{project_id}', status_code=204)
-    def delete_project(project_id: int, request: Request, user: User = Depends(current_user)):
-        from sqlalchemy.orm.exc import StaleDataError
-        with Session(engine) as db:
-            item = find(db, project_id, user.id)
-            match_version(request, item)
-            db.delete(item)
-            try:
-                db.commit()
-            except StaleDataError:
-                raise HTTPException(409, '项目已被修改，请刷新后重试')
-        return Response(status_code=204)
-
-    @app.get('/api/export')
-    def export(user: User = Depends(current_user)):
-        with Session(engine) as db:
-            projects = [ProjectOutput.model_validate(p).model_dump(mode='json') for p in db.scalars(select(Project).where(Project.owner_id == user.id).order_by(Project.id)).all()]
-        data = json.dumps({'application': 'FlowDesk', 'schema_version': 2, 'exported_at': datetime.now(timezone.utc).isoformat(), 'projects': projects}, ensure_ascii=False, indent=2)
-        return Response(data, media_type='application/json', headers={'Content-Disposition': 'attachment; filename="FlowDesk-projects.json"'})
 
     if static_dir and static_dir.exists():
         app.mount('/assets', StaticFiles(directory=static_dir / 'assets'), name='assets')
