@@ -3,7 +3,7 @@ import {computed, nextTick, onMounted, onUnmounted, reactive, ref, watch} from '
 import {useRoute, useRouter} from 'vue-router';
 import {ApiError,request,type User} from './api';
 const props=defineProps<{user:User;authBusy:boolean}>();
-const emit=defineEmits<{logout:[];account:[];'session-lost':[];'switch-view':[];'switch-tasks':[];'switch-dashboard':[];'switch-files':[]}>();
+const emit=defineEmits<{logout:[];account:[];'session-lost':[];'switch-view':[];'switch-tasks':[];'switch-dashboard':[];'switch-files':[];'switch-ai':[]}>();
 type Status = 'Planning'|'Active'|'Paused'|'Completed'|'Archived';
 type Input = {workspace_id:number|null;name:string;description:string;status:Status;start_date:string|null;deadline:string|null};
 type Project = Input & {id:number;owner_id:number|null;created_at:string;updated_at:string;version:number};
@@ -81,6 +81,7 @@ onUnmounted(()=>{clearInterval(clockTimer);clearTimeout(toastTimer);});
    <button class="nav-item" @click="emit('switch-tasks')"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>任务</button>
    <button class="nav-item" @click="emit('switch-dashboard')"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>仪表盘</button>
    <button class="nav-item" @click="emit('switch-files')"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>文件</button>
+   <button class="nav-item" @click="emit('switch-ai')"><svg viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 1 4 4c0 .6-.13 1.17-.37 1.68A6 6 0 0 1 18 13c0 .8-.16 1.57-.45 2.27A5 5 0 0 1 20 19v2h-2v-2a3 3 0 0 0-6 0v2h-2v-2a3 3 0 0 0-6 0v2H2v-2a5 5 0 0 1 2.45-3.73A6.3 6.3 0 0 1 4 13a6 6 0 0 1 6.37-5.32A4 4 0 0 1 12 2z"/></svg>AI 助手</button>
    <div class="nav-label status-label">项目状态</div>
    <button v-for="s in statuses" :key="s" class="status-nav" :class="{chosen:filter===s&&!isDetail}" @click="chooseStatus(s)"><i class="dot" :class="s"></i>{{labels[s]}}<span>{{counts[s]}}</span></button>
    <div class="sidebar-bottom"><div class="offline"><span class="local-dot"></span> 本地运行 · 数据保存在此电脑</div><button class="profile profile-button" aria-label="查看当前账号" @click="emit('account')"><span class="avatar">{{Array.from(user.username).slice(0,1).join('')}}</span><div><strong>{{user.username}}</strong><small>{{user.email}}</small></div><span class="profile-arrow">↗</span></button></div>

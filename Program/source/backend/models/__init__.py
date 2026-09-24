@@ -6,5 +6,8 @@ from .user import AppSetting, LoginAttempt, LoginSession, User
 from .project import Project
 from .workspace import Membership, Workspace
 from .task import Task
+from .file import File
+from .collaboration import Activity, Comment
+from .ai import AiConversation, AiMessage, AiSetting
 
-__all__ = ['Base', 'User', 'Project', 'LoginSession', 'LoginAttempt', 'AppSetting', 'Workspace', 'Membership', 'Task']
+__all__ = ['Base', 'User', 'Project', 'LoginSession', 'LoginAttempt', 'AppSetting', 'Workspace', 'Membership', 'Task', 'File', 'Comment', 'Activity', 'AiConversation', 'AiMessage', 'AiSetting']
