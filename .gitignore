@@ -26,6 +26,11 @@ node_modules/
 dist/
 *.lnk
 
+# 客户端与文件存储（M9 Electron 壳依赖、M5 附件本地存储）
+desktop/node_modules/
+uploads/
+Program/source/uploads/
+
 # 编辑器与系统
 .vscode/
 .idea/
