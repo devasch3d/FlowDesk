@@ -6,10 +6,35 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "dev:remote": "cross-env FLOWDESK_BACKEND_URL=http://127.0.0.1:8000 electron ."
+    "pack": "electron-builder --win portable",
+    "pack:install": "electron-builder --win nsis"
+  },
+  "build": {
+    "appId": "com.flowdesk.app",
+    "productName": "FlowDesk",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist/flowdesk-backend",
+        "to": "backend"
+      }
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ]
+    }
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "electron": "^33.0.0",
-    "cross-env": "^7.0.3"
+    "electron-builder": "^26.15.3"
   }
 }

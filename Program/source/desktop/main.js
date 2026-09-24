@@ -72,6 +72,7 @@ function resolveBackend() {
   if (process.resourcesPath) {
     const exe = path.join(process.resourcesPath, 'backend', 'flowdesk-backend.exe');
     if (fs.existsSync(exe)) return {cmd: exe, args: ['--headless', '--host', '127.0.0.1', '--port']};
+    console.log('[FlowDesk] embedded backend NOT found at ' + exe);
   }
   if (fs.existsSync(VENV_PYTHON)) {
     return {cmd: VENV_PYTHON, args: [LAUNCHER, '--headless', '--host', '127.0.0.1', '--port']};
@@ -81,6 +82,7 @@ function resolveBackend() {
 
 function startBackend(port) {
   const {cmd, args} = resolveBackend();
+  console.log('[FlowDesk] startBackend port=' + port + ' cmd=' + cmd);
   backend = spawn(cmd, [...args, String(port)], {
     cwd: SOURCE_DIR,
     windowsHide: true,
@@ -111,6 +113,8 @@ function createWindow(url, localFallback = false) {
 }
 
 app.whenReady().then(async () => {
+  console.log('[FlowDesk] resourcesPath=' + (process.resourcesPath || 'N/A'));
+  console.log('[FlowDesk] __dirname=' + __dirname);
   let activeUrl;
   const devUrl = process.env.VITE_DEV_SERVER_URL;
   if (devUrl) {
@@ -119,6 +123,7 @@ app.whenReady().then(async () => {
   } else {
     // 联网优先：探测服务端
     const online = await probeServer(SERVER_URL);
+    console.log('[FlowDesk] probe ' + SERVER_URL + ' online=' + online);
     if (online) {
       activeUrl = SERVER_URL;
       createWindow(activeUrl);

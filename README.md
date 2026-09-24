@@ -71,3 +71,32 @@ $env:FLOWDESK_BACKEND_URL="http://<服务器IP>:8000"; npm start
 ```
 
 测试：`.\.venv\Scripts\python.exe -m pytest tests/ -q`；前端构建：`cd frontend; npm ci; npm run build`。
+
+## 客户端打包（正式分发）
+
+产物：`Program\source\desktop\release\FlowDesk-0.1.0-win.zip`（解压即用，**内嵌后端 exe**，目标电脑无需装 Python/Node）。
+
+```powershell
+# 1) 后端打成独立 exe（PyInstaller onedir → Program\source\dist\flowdesk-backend\）
+cd Program\source
+.\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --name flowdesk-backend `
+  --add-data "frontend/dist;frontend/dist" --collect-submodules uvicorn --collect-submodules sqlalchemy `
+  --hidden-import multipart launcher.py
+
+# 2) 客户端打包（内嵌后端 + 自动连接/降级逻辑）
+cd desktop
+$env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"   # 国内镜像（可选）
+npx electron-builder --win zip        # 便携 zip（推荐分发）
+npx electron-builder --win portable   # 自解压单 exe（已知问题：内嵌后端未拉起，暂用 zip）
+npx electron-builder --win nsis       # 安装版
+```
+
+**客户端启动决策**（`desktop/main.js`）：先探测 `FLOWDESK_SERVER_URL`（默认 `http://192.168.1.23:8000`，打包前在 main.js 改为你的固定 IP）→ 连上 = 联网协作；连不上 = 自动降级本机模式（内嵌后端）。
+
+## 固定 IP（服务端常驻前提）
+
+1. 浏览器进入路由器后台（常见 `192.168.x.1`）→ 登录
+2. 找到「DHCP 服务器 / 静态地址分配 / 地址保留」
+3. 添加一条：服务端电脑的 **MAC 地址** → 分配固定 IP（如 `192.168.223.100`）
+4. 保存后重启该电脑网络；`ipconfig` 确认 IP 不再变化
+5. 把该 IP 填进 `desktop/main.js` 的 `DEFAULT_SERVER_URL` 后重新打包，其他电脑双击即自动连上
