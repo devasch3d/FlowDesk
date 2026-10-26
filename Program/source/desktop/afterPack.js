@@ -20,11 +20,11 @@ const ENT_MAIN = `<?xml version="1.0" encoding="UTF-8"?>
 <key>com.apple.security.cs.disable-library-validation</key><true/>
 </dict></plist>`;
 
+// Helper 必须只带 inherit 一项：Apple 规定 com.apple.security.inherit 不能与其他
+// entitlement 组合，否则 AMFI 直接击杀进程（Renderer 的 JIT 权限由继承主程序获得）。
 const ENT_HELPER = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>com.apple.security.cs.allow-jit</key><true/>
-<key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/>
 <key>com.apple.security.inherit</key><true/>
 </dict></plist>`;
 
@@ -50,12 +50,12 @@ exports.default = async function afterPack(context) {
   console.log('[afterPack] ad-hoc signing ' + appPath);
   const frameworks = path.join(appPath, 'Contents', 'Frameworks');
 
-  // 1) Frameworks 内的 dylib/framework（无 entitlements）
+  // 1) Frameworks 内的 framework（Electron Framework 按官方惯例带主程序 entitlements）
   for (const name of fs.readdirSync(frameworks)) {
     const full = path.join(frameworks, name);
     if (name.endsWith('.framework')) {
       const bin = path.join(full, name.replace(/\.framework$/, ''));
-      if (fs.existsSync(bin)) sign(bin);
+      if (fs.existsSync(bin)) sign(bin, name === 'Electron Framework.framework' ? entMain : null);
     }
   }
 
