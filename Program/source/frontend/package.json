@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "vite --configLoader runner",
     "build": "vue-tsc --noEmit && vite build --configLoader runner"
   },
   "dependencies": {

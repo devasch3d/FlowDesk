@@ -1,0 +1,90 @@
+# FlowDesk Release：推送 v* 标签后自动构建 Windows / macOS 安装包并发布到 GitHub Releases。
+# 构建链路：vite 构建前端 → PyInstaller onedir 打包后端（内嵌前端产物）→ electron-builder 内嵌后端出安装包。
+# 产物：Windows NSIS 安装包 + 便携 zip；macOS dmg（arm64 与 x64 各一份）。
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+          - os: macos-latest      # Apple Silicon (arm64)
+            platform: mac
+          - os: macos-15-intel    # Intel (x64)；macos-13 已退役，此镜像为最后的 x86_64 镜像
+            platform: mac
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: Program/source
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Build frontend
+        working-directory: Program/source/frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Package backend (PyInstaller onedir)
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then SEP=';'; else SEP=':'; fi
+          python -m PyInstaller --noconfirm --clean --onedir --name flowdesk-backend \
+            --add-data "frontend/dist${SEP}frontend/dist" \
+            --collect-submodules uvicorn --collect-submodules sqlalchemy \
+            --hidden-import multipart \
+            launcher.py
+
+      - name: Backend smoke test
+        shell: bash
+        run: |
+          BIN=./dist/flowdesk-backend/flowdesk-backend
+          [[ "$RUNNER_OS" == "Windows" ]] && BIN="$BIN.exe"
+          "$BIN" --headless --host 127.0.0.1 --port 18999 --data-dir ./smoke-data &
+          BACKEND_PID=$!
+          OK=""
+          for _ in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:18999/api/health >/dev/null; then OK=1; break; fi
+            sleep 1
+          done
+          kill "$BACKEND_PID" 2>/dev/null || true
+          if [[ -z "$OK" ]]; then echo "backend smoke test failed"; exit 1; fi
+
+      - name: Build desktop installers
+        working-directory: Program/source/desktop
+        run: |
+          npm ci
+          npx electron-builder --${{ matrix.platform }}
+
+      - name: Publish to GitHub Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          FILES=(desktop/release/*.exe desktop/release/*.zip desktop/release/*.dmg)
+          if [[ ${#FILES[@]} -eq 0 ]]; then echo "no installer artifacts found"; exit 1; fi
+          # 矩阵任务并行：先到者创建 Release，后到者直接上传补充产物
+          gh release create "$GITHUB_REF_NAME" --generate-notes "${FILES[@]}" \
+            || gh release upload "$GITHUB_REF_NAME" "${FILES[@]}" --clobber

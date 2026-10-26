@@ -1,13 +1,14 @@
 {
   "name": "flowdesk-desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "FlowDesk 桌面客户端（Electron 壳，M9）",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "pack": "electron-builder --win portable",
-    "pack:install": "electron-builder --win nsis"
+    "pack": "electron-builder --win zip",
+    "pack:install": "electron-builder --win nsis",
+    "pack:mac": "electron-builder --mac dmg"
   },
   "build": {
     "appId": "com.flowdesk.app",
@@ -28,8 +29,16 @@
     ],
     "win": {
       "target": [
-        "portable"
+        "nsis",
+        "zip"
       ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.productivity",
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
     }
   },
   "devDependencies": {

@@ -1,12 +1,20 @@
-# FlowDesk M2 Authentication
+# FlowDesk 源码说明
 
-在 M1 Project 上增加用户身份和项目归属，版本为 0.2.0。Windows EXE 内置 Vue 前端、FastAPI 后端、Python 运行时和 SQLite 驱动；日常使用不需要开发环境。
+FlowDesk 是 AI 驱动的个人与小团队工作管理平台：**桌面客户端（Electron）＋云端服务端**。本目录包含后端（FastAPI + SQLite）、前端（Vue 3 + Vite）与桌面壳（Electron）三部分源码。版本号 0.2.0；里程碑 M1–M9 均已完成。
 
 ## 已实现的范围
 
-注册、登录、退出、保持登录、当前用户信息、项目所属用户与权限检查。M1 的 CRUD、搜索、筛选、日期校验、乐观锁和导出继续可用。
+- **M1 Project**：项目增删改查、搜索筛选、日期校验、乐观锁、JSON 导出。
+- **M2 Account**：注册/登录/退出/保持登录、会话管理、scrypt 密码哈希、按 owner_id 的权限隔离、登录限流、数据库迁移与备份（本文件以下部分详述）。
+- **M3 Workspace**：空间 + 成员多对多、Owner/Admin/Member 角色权限矩阵、按邮箱邀请成员。
+- **M4 Task**：任务全生命周期（状态/优先级/负责人/截止日/If-Match 乐观锁）。
+- **M5 Files**：项目附件上传/下载/删除（本地存储、文件名消毒）。
+- **M6 Dashboard**：空间/项目统计聚合 + 仪表盘视图。
+- **M7 Collaboration**：任务评论 + 活动动态（全员留痕）。
+- **M8 AI Copilot**：AI 会话、项目理解、任务提案（经确认才落库，OpenAI 兼容 API）。
+- **M9 Desktop + 服务端化**：Electron 桌面客户端（自动拉起后端）、联网服务端模式（跨源/Host 白名单、局域网 UDP 自动发现、远程访问），见 `desktop/README.md` 与仓库根 `03-技术架构.md` §7。
 
-资料编辑、头像、修改密码、找回密码、邮箱验证、OAuth、Workspace 和 Task 不在本次范围内。M1 的无账号项目由首次注册用户明确确认后接收。本次交付没有自动迁移用户另存目录的真实数据。
+资料编辑、头像、修改密码、找回密码、邮箱验证、OAuth 不在当前范围内。M1 的无账号项目由首次注册用户明确确认后接收。本次交付没有自动迁移用户另存目录的真实数据。
 
 ## 最重要的两条链路
 
@@ -67,17 +75,26 @@ erDiagram
 
 | 文件 | 负责内容 |
 | --- | --- |
-| frontend/src/App.vue | 登录门禁、注册登录界面、当前账号、跨页面账号状态同步 |
-| frontend/src/Projects.vue | 原有 Project 界面与项目请求 |
+| frontend/src/App.vue | 登录门禁、注册登录界面、当前账号、跨页面账号状态同步、路由 |
+| frontend/src/Projects.vue | 项目界面与项目请求 |
+| frontend/src/Workspaces.vue | 空间与成员管理界面（M3） |
+| frontend/src/TaskView.vue | 任务看板/详情界面（M4） |
+| frontend/src/views/FilesView.vue | 附件上传下载界面（M5） |
+| frontend/src/views/DashboardView.vue | 仪表盘界面（M6） |
+| frontend/src/views/CommentSection.vue、ActivityView.vue | 任务评论与活动动态（M7） |
+| frontend/src/views/AIView.vue | AI Copilot 会话界面（M8） |
 | frontend/src/api.ts | HTTP 请求、超时和错误处理 |
-| frontend/src/auth.css | 账号界面的桌面与窄屏布局 |
-| backend/models.py | User、Project、Session 与辅助表 |
+| frontend/src/auth.css、style.css | 界面样式 |
+| backend/models/ | 各表模型：User/Session、Project、Workspace/Membership、Task、File、Comment/Activity、AI 会话 |
+| backend/routers/ | 各资源 API：projects、workspaces、tasks、files、collaboration、dashboard、ai |
 | backend/auth.py | 注册登录、会话、当前用户、登录节流 |
 | backend/security.py | 密码哈希、密码验证、令牌摘要 |
-| backend/app.py | 带认证与归属检查的 Project API、静态资源服务 |
-| backend/migrations.py | M1 数据库备份与增量升级 |
+| backend/app.py | 应用入口：安全中间件、认证与各路由挂载、静态资源服务、跨源/Host 白名单（M9） |
+| backend/migrations.py | 数据库备份与增量升级 |
 | backend/backup.py | 完整数据库备份，移除副本中的会话 |
-| launcher.py | 桌面启动窗口、本地服务、浏览器、全库备份 |
+| launcher.py | 本地服务启动、浏览器/无头模式、局域网 UDP 广播、全库备份 |
+| desktop/main.js | Electron 主进程：启动决策链、后端进程管理、窗口（M9） |
+| desktop/preload.js | 预加载脚本：最小权限暴露只读信息 |
 
 ## 认证接口
 
@@ -134,30 +151,38 @@ SQLite 是本次验证的数据库。保留 `FLOWDESK_DATABASE_URL=postgresql+ps
 
 ## 从源码运行与重新打包
 
-需要 Windows x64、Python 3.12；重新构建前端需要 Node.js 22.12+。在 source 文件夹执行：
+需要 Python 3.12 与 Node.js 22+。仓库不含编译产物，首次运行需先构建前端。
+
+**Windows**（在 source 文件夹执行）：
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe launcher.py
+cd frontend; npm ci; npm run build; cd ..
+.\.venv\Scripts\python.exe launcher.py        # 本地单机：自动打开浏览器
 ```
 
-已经包含编译后的 frontend/dist，可直接运行。修改前端之后：
+**macOS / Linux**：
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+(cd frontend && npm ci && npm run build)
+.venv/bin/python launcher.py
+```
+
+前端开发模式（热更新）：`cd frontend && npm run dev`（Vite dev server，配合 `desktop/README.md` 的 VITE_DEV_SERVER_URL 使用）。
+
+**桌面客户端**（Electron，Win/Mac 通用）：见 `desktop/README.md`。
+
+**正式安装包（Win + Mac）**：推送 `v*` 标签后由 GitHub Actions 自动构建（`.github/workflows/release.yml`），产物发布到仓库 Releases 页面：Windows NSIS 安装包 + 便携 zip，macOS dmg（Apple Silicon 与 Intel 各一份）。本地手动打包：
 
 ```powershell
-cd frontend
-npm ci
-npm run build
-cd ..
+# Windows：后端 PyInstaller onedir → dist\flowdesk-backend\，再 electron-builder
+powershell -ExecutionPolicy Bypass -File .\build.ps1   # 浏览器版单文件 EXE → release\FlowDesk.exe
 ```
 
-重新生成单文件 EXE：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\build.ps1
-```
-
-结果在 `source/release/FlowDesk.exe`。运行成品不需要网络；安装构建依赖时需要网络。不要把生成目录、真实 data、密码、数据库备份或 .env 提交到 Git。
+运行成品不需要网络；安装构建依赖时需要网络。不要把生成目录、真实 data、密码、数据库备份或 .env 提交到 Git。
 
 ## 测试与验证
 

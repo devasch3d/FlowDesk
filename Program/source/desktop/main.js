@@ -18,8 +18,11 @@ const http = require('http');
 
 const SOURCE_DIR = path.join(__dirname, '..');          // 开发期：Program/source
 const LAUNCHER = path.join(SOURCE_DIR, 'launcher.py');
-// 开发期优先项目 venv 的 Python；打包后优先内嵌的后端 exe（见 resolveBackend()）
-const VENV_PYTHON = path.join(SOURCE_DIR, '.venv', 'Scripts', 'python.exe');
+// 开发期优先项目 venv 的 Python；打包后优先内嵌的后端可执行文件（见 resolveBackend()）
+const VENV_PYTHON = process.platform === 'win32'
+  ? path.join(SOURCE_DIR, '.venv', 'Scripts', 'python.exe')
+  : path.join(SOURCE_DIR, '.venv', 'bin', 'python');
+const BACKEND_BIN_NAME = process.platform === 'win32' ? 'flowdesk-backend.exe' : 'flowdesk-backend';
 
 // 与服务端 launcher.py 一致的 UDP 发现端口
 const DISCOVERY_PORT = 45678;
@@ -96,10 +99,10 @@ function waitForHealth(port, timeoutMs = 30000, intervalMs = 300) {
   });
 }
 
-// 解析后端启动命令：打包环境（resources/backend/*.exe）→ 开发 venv python → PATH python
+// 解析后端启动命令：打包环境（resources/backend/可执行文件）→ 开发 venv python → PATH python
 function resolveBackend() {
   if (process.resourcesPath) {
-    const exe = path.join(process.resourcesPath, 'backend', 'flowdesk-backend.exe');
+    const exe = path.join(process.resourcesPath, 'backend', BACKEND_BIN_NAME);
     if (fs.existsSync(exe)) return {cmd: exe, args: ['--headless', '--host', '127.0.0.1', '--port']};
     console.log('[FlowDesk] embedded backend NOT found at ' + exe);
   }
@@ -151,7 +154,8 @@ app.whenReady().then(async () => {
     createWindow(activeUrl);
   } else {
     // 1) 显式配置的服务端地址（打包写死 / 环境变量）
-    const explicit = process.env.FLOWDESK_SERVER_URL;
+    //    兼容两个变量名：FLOWDESK_SERVER_URL（主）与 FLOWDESK_BACKEND_URL（文档历史名）
+    const explicit = process.env.FLOWDESK_SERVER_URL || process.env.FLOWDESK_BACKEND_URL;
     let connected = explicit ? await probeServer(explicit) : false;
     if (connected) activeUrl = explicit;
 

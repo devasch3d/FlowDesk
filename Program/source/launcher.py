@@ -52,7 +52,13 @@ def main():
     parser.add_argument('--self-test', action='store_true', help='Validate bundled desktop runtime without opening a browser')
     args = parser.parse_args()
     base = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
-    location = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent.parent
+    if getattr(sys, 'frozen', False):
+        location = Path(sys.executable).parent
+        # macOS：数据放入用户目录，避免写 .app 包内（权限/签名问题）
+        if sys.platform == 'darwin':
+            location = Path.home() / 'Library' / 'Application Support' / 'FlowDesk'
+    else:
+        location = Path(__file__).resolve().parent.parent
     data = Path(args.data_dir) if args.data_dir else location / 'data'
     data.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(filename=data / 'flowdesk.log', encoding='utf-8', level=logging.INFO)

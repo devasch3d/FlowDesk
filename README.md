@@ -46,6 +46,8 @@ AI 驱动的个人与小团队工作管理平台：**桌面客户端（Electron�
 
 ## 给开发者的快速开始
 
+> 普通用户无需看本节：直接到 [Releases](../../releases) 下载对应平台的安装包（Windows `.exe` / macOS `.dmg`）。
+
 ```powershell
 cd Program\source
 python -m venv .venv
@@ -74,7 +76,12 @@ $env:FLOWDESK_BACKEND_URL="http://<服务器IP>:8000"; npm start
 
 ## 客户端打包（正式分发）
 
-产物：`Program\source\desktop\release\FlowDesk-0.1.0-win.zip`（解压即用，**内嵌后端 exe**，目标电脑无需装 Python/Node）。
+**推荐：CI 自动构建。** 推送 `v*` 标签后 GitHub Actions（`.github/workflows/release.yml`）在 Windows/macOS 云端分别打包并发布到仓库 **Releases** 页面，直接下载即可：
+
+- Windows：NSIS 安装包（`FlowDesk-<版本>-setup.exe`）+ 便携 zip
+- macOS：dmg（Apple Silicon `arm64` 与 Intel `x64` 各一份）
+
+以下为**本地手动打包**（Windows 示例）。产物：`Program\source\desktop\release\`（内嵌后端，目标电脑无需装 Python/Node）。
 
 ```powershell
 # 1) 后端打成独立 exe（PyInstaller onedir → Program\source\dist\flowdesk-backend\）
