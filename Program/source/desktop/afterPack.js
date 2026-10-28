@@ -51,9 +51,23 @@ exports.default = async function afterPack(context) {
   const frameworks = path.join(appPath, 'Contents', 'Frameworks');
 
   // 1) Frameworks 内的 framework（Electron Framework 按官方惯例带主程序 entitlements）
+  //    注意：x64 版 Electron 发行包内的 chrome_crashpad_handler 等嵌套 helper 完全未签名
+  //    （x64 不强制签名），而 arm64 版自带签名——因此重签主二进制前必须先签最内层
+  //    的 Helpers/Libraries，否则 codesign 校验子组件时报 "code object is not signed at all"。
   for (const name of fs.readdirSync(frameworks)) {
     const full = path.join(frameworks, name);
     if (name.endsWith('.framework')) {
+      const inner = path.join(full, 'Versions', 'A');
+      // 1a) framework 内嵌的独立可执行文件与动态库（先内层）
+      for (const sub of ['Helpers', 'Libraries']) {
+        const subDir = path.join(inner, sub);
+        if (!fs.existsSync(subDir)) continue;
+        for (const f of fs.readdirSync(subDir)) {
+          const fPath = path.join(subDir, f);
+          if (fs.statSync(fPath).isFile()) sign(fPath, entMain);
+        }
+      }
+      // 1b) framework 主二进制（后外层）
       const bin = path.join(full, name.replace(/\.framework$/, ''));
       if (fs.existsSync(bin)) sign(bin, name === 'Electron Framework.framework' ? entMain : null);
     }
